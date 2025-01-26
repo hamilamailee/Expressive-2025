@@ -1,0 +1,6 @@
+**/__pycache__/**
+**/jobscript
+**/jnotebook*
+
+Pytorch_Retinaface-master/data/*
+Pytorch_Retinaface-master/weights/*
