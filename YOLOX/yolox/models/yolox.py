@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
+# Copyright (c) Megvii Inc. All rights reserved.
 
-import megengine.module as M
+import torch.nn as nn
 
 from .yolo_head import YOLOXHead
 from .yolo_pafpn import YOLOPAFPN
 
 
-class YOLOX(M.Module):
+class YOLOX(nn.Module):
     """
     YOLOX model module. The module list is defined by create_yolov3_modules function.
     The network returns loss values from three YOLO layers during training
@@ -46,3 +46,7 @@ class YOLOX(M.Module):
             outputs = self.head(fpn_outs)
 
         return outputs
+
+    def visualize(self, x, targets, save_prefix="assign_vis_"):
+        fpn_outs = self.backbone(x)
+        self.head.visualize_assign_result(fpn_outs, targets, x, save_prefix)

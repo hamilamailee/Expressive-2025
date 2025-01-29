@@ -1,71 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding:utf-8 -*-
-# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
-
-from typing import Optional
+# Copyright (c) Megvii Inc. All rights reserved.
 
 import numpy as np
 
-import megengine.functional as F
-from megengine import Tensor
+import torch
+import torchvision
 
 __all__ = [
-    "batched_nms",
     "filter_box",
     "postprocess",
     "bboxes_iou",
     "matrix_iou",
     "adjust_box_anns",
     "xyxy2xywh",
+    "xyxy2cxcywh",
+    "cxcywh2xyxy",
 ]
-
-
-def batched_nms(
-    boxes: Tensor, scores: Tensor, idxs: Tensor, iou_thresh: float, max_output: Optional[int] = None
-) -> Tensor:
-    r"""
-    Performs non-maximum suppression (NMS) on the boxes according to
-    their intersection-over-union (IoU).
-    :param boxes: tensor of shape `(N, 4)`; the boxes to perform nms on;
-        each box is expected to be in `(x1, y1, x2, y2)` format.
-    :param iou_thresh: ``IoU`` threshold for overlapping.
-    :param idxs: tensor of shape `(N,)`, the class indexs of boxes in the batch.
-    :param scores: tensor of shape `(N,)`, the score of boxes.
-
-    :return: indices of the elements that have been kept by NMS.
-
-    Examples:
-    .. testcode::
-        import numpy as np
-        from megengine import tensor
-        x = np.zeros((100,4))
-        np.random.seed(42)
-        x[:,:2] = np.random.rand(100,2) * 20
-        x[:,2:] = np.random.rand(100,2) * 20 + 100
-        scores = tensor(np.random.rand(100))
-        idxs = tensor(np.random.randint(0, 10, 100))
-        inp = tensor(x)
-        result = batched_nms(inp, scores, idxs, iou_thresh=0.6)
-        print(result.numpy())
-
-    Outputs:
-    .. testoutput::
-        [75 41 99 98 69 64 11 27 35 18]
-    """
-    assert (
-        boxes.ndim == 2 and boxes.shape[1] == 4
-    ), "the expected shape of boxes is (N, 4)"
-    assert scores.ndim == 1, "the expected shape of scores is (N,)"
-    assert idxs.ndim == 1, "the expected shape of idxs is (N,)"
-    assert (
-        boxes.shape[0] == scores.shape[0] == idxs.shape[0]
-    ), "number of boxes, scores and idxs are not matched"
-
-    idxs = idxs.detach()
-    max_coordinate = boxes.max()
-    offsets = idxs * (max_coordinate + 1)
-    boxes = boxes + offsets.reshape(-1, 1)
-    return F.vision.nms(boxes, scores, iou_thresh, max_output)
 
 
 def filter_box(output, scale_range):
@@ -79,8 +29,8 @@ def filter_box(output, scale_range):
     return output[keep]
 
 
-def postprocess(prediction, num_classes, conf_thre=0.7, nms_thre=0.45):
-    box_corner = F.zeros_like(prediction)
+def postprocess(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
+    box_corner = prediction.new(prediction.shape)
     box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
     box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
     box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
@@ -91,28 +41,37 @@ def postprocess(prediction, num_classes, conf_thre=0.7, nms_thre=0.45):
     for i, image_pred in enumerate(prediction):
 
         # If none are remaining => process next image
-        if not image_pred.shape[0]:
+        if not image_pred.size(0):
             continue
         # Get score and class with highest confidence
-        # class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)
-        class_conf = F.max(image_pred[:, 5: 5 + num_classes], axis=1, keepdims=True)
-        class_pred = F.argmax(image_pred[:, 5: 5 + num_classes], axis=1, keepdims=True)
+        class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)
 
-        conf_mask = (image_pred[:, 4] * class_conf.reshape(-1) >= conf_thre)
+        conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
         # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
-        detections = F.concat((image_pred[:, :5], class_conf, class_pred), 1)
+        detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
         detections = detections[conf_mask]
-        if not detections.shape[0]:
+        if not detections.size(0):
             continue
 
-        nms_out_index = batched_nms(
-            detections[:, :4], detections[:, 4] * detections[:, 5], detections[:, 6], nms_thre,
-        )
+        if class_agnostic:
+            nms_out_index = torchvision.ops.nms(
+                detections[:, :4],
+                detections[:, 4] * detections[:, 5],
+                nms_thre,
+            )
+        else:
+            nms_out_index = torchvision.ops.batched_nms(
+                detections[:, :4],
+                detections[:, 4] * detections[:, 5],
+                detections[:, 6],
+                nms_thre,
+            )
+
         detections = detections[nms_out_index]
         if output[i] is None:
             output[i] = detections
         else:
-            output[i] = F.concat((output[i], detections))
+            output[i] = torch.cat((output[i], detections))
 
     return output
 
@@ -122,28 +81,25 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=True):
         raise IndexError
 
     if xyxy:
-        tl = F.maximum(F.expand_dims(bboxes_a[:, :2], axis=1), bboxes_b[:, :2])
-        br = F.minimum(F.expand_dims(bboxes_a[:, 2:], axis=1), bboxes_b[:, 2:])
-        area_a = (bboxes_a[:, 2] - bboxes_a[:, 0]) * (bboxes_a[:, 3] - bboxes_a[:, 1])
-        area_b = (bboxes_b[:, 2] - bboxes_b[:, 0]) * (bboxes_b[:, 3] - bboxes_b[:, 1])
+        tl = torch.max(bboxes_a[:, None, :2], bboxes_b[:, :2])
+        br = torch.min(bboxes_a[:, None, 2:], bboxes_b[:, 2:])
+        area_a = torch.prod(bboxes_a[:, 2:] - bboxes_a[:, :2], 1)
+        area_b = torch.prod(bboxes_b[:, 2:] - bboxes_b[:, :2], 1)
     else:
-        tl = F.maximum(
-            F.expand_dims(bboxes_a[:, :2] - bboxes_a[:, 2:] / 2, axis=1),
+        tl = torch.max(
+            (bboxes_a[:, None, :2] - bboxes_a[:, None, 2:] / 2),
             (bboxes_b[:, :2] - bboxes_b[:, 2:] / 2),
         )
-        br = F.minimum(
-            F.expand_dims(bboxes_a[:, :2] + bboxes_a[:, 2:] / 2, axis=1),
+        br = torch.min(
+            (bboxes_a[:, None, :2] + bboxes_a[:, None, 2:] / 2),
             (bboxes_b[:, :2] + bboxes_b[:, 2:] / 2),
         )
 
-        area_a = bboxes_a[:, 2] * bboxes_a[:, 3]
-        area_b = bboxes_b[:, 2] * bboxes_b[:, 3]
-    mask = (tl < br).astype("int32")
-    mask = mask[..., 0] * mask[..., 1]
-    diff = br - tl
-    area_i = diff[..., 0] * diff[..., 1] * mask
-    del diff
-    return area_i / (F.expand_dims(area_a, axis=1) + area_b - area_i)
+        area_a = torch.prod(bboxes_a[:, 2:], 1)
+        area_b = torch.prod(bboxes_b[:, 2:], 1)
+    en = (tl < br).type(tl.type()).prod(dim=2)
+    area_i = torch.prod(br - tl, 2) * en  # * ((tl < br).all())
+    return area_i / (area_a[:, None] + area_b - area_i)
 
 
 def matrix_iou(a, b):
@@ -168,4 +124,20 @@ def adjust_box_anns(bbox, scale_ratio, padw, padh, w_max, h_max):
 def xyxy2xywh(bboxes):
     bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 0]
     bboxes[:, 3] = bboxes[:, 3] - bboxes[:, 1]
+    return bboxes
+
+
+def xyxy2cxcywh(bboxes):
+    bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 0]
+    bboxes[:, 3] = bboxes[:, 3] - bboxes[:, 1]
+    bboxes[:, 0] = bboxes[:, 0] + bboxes[:, 2] * 0.5
+    bboxes[:, 1] = bboxes[:, 1] + bboxes[:, 3] * 0.5
+    return bboxes
+
+
+def cxcywh2xyxy(bboxes):
+    bboxes[:, 0] = bboxes[:, 0] - bboxes[:, 2] * 0.5
+    bboxes[:, 1] = bboxes[:, 1] - bboxes[:, 3] * 0.5
+    bboxes[:, 2] = bboxes[:, 0] + bboxes[:, 2]
+    bboxes[:, 3] = bboxes[:, 1] + bboxes[:, 3]
     return bboxes

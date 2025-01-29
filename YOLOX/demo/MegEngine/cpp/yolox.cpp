@@ -15,8 +15,8 @@
 /**
  * @brief Define names based depends on Unicode path support
  */
-#define NMS_THRESH 0.65
-#define BBOX_CONF_THRESH 0.3
+#define NMS_THRESH 0.45
+#define BBOX_CONF_THRESH 0.25
 
 constexpr int INPUT_W = 640;
 constexpr int INPUT_H = 640;
@@ -35,17 +35,14 @@ cv::Mat static_resize(cv::Mat &img) {
 }
 
 void blobFromImage(cv::Mat &img, float *blob_data) {
-  cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
   int channels = 3;
   int img_h = img.rows;
   int img_w = img.cols;
-  std::vector<float> mean = {0.485, 0.456, 0.406};
-  std::vector<float> std = {0.229, 0.224, 0.225};
   for (size_t c = 0; c < channels; c++) {
     for (size_t h = 0; h < img_h; h++) {
       for (size_t w = 0; w < img_w; w++) {
         blob_data[c * img_w * img_h + h * img_w + w] =
-            (((float)img.at<cv::Vec3b>(h, w)[c]) / 255.0f - mean[c]) / std[c];
+            (float)img.at<cv::Vec3b>(h, w)[c];
       }
     }
   }
@@ -359,10 +356,11 @@ int main(int argc, char *argv[]) {
   auto &&graph_opt = load_config.comp_graph->options();
   graph_opt.graph_opt_level = 0;
 
-  if (argc != 7) {
+  if (argc != 9) {
     std::cout << "Usage : " << argv[0]
               << " <path_to_model> <path_to_image> <device> <warmup_count> "
-                 "<thread_number> <run_with_fp16>"
+                 "<thread_number> <use_fast_run> <use_weight_preprocess> "
+                 "<run_with_fp16>"
               << std::endl;
     return EXIT_FAILURE;
   }
@@ -372,29 +370,27 @@ int main(int argc, char *argv[]) {
   const std::string device{argv[3]};
   const size_t warmup_count = atoi(argv[4]);
   const size_t thread_number = atoi(argv[5]);
-  const size_t run_with_fp16 = atoi(argv[6]);
-  const size_t use_fast_run = 1;
-  const size_t use_weight_preprocess = 1;
+  const size_t use_fast_run = atoi(argv[6]);
+  const size_t use_weight_preprocess = atoi(argv[7]);
+  const size_t run_with_fp16 = atoi(argv[8]);
 
   if (device == "cuda") {
     load_config.comp_node_mapper = [](CompNode::Locator &loc) {
       loc.type = CompNode::DeviceType::CUDA;
     };
   } else if (device == "cpu") {
-    std::cout << "use " << thread_number << " thread" << std::endl;
-    if (thread_number == 1) {
-      load_config.comp_node_mapper = [](CompNode::Locator &loc) {
-        loc.type = CompNode::DeviceType::CPU;
-      };
-    } else {
-      load_config.comp_node_mapper = [thread_number](CompNode::Locator &loc) {
-        loc.type = CompNode::DeviceType::MULTITHREAD;
-        loc.device = 0;
-        loc.stream = thread_number;
-      };
+    load_config.comp_node_mapper = [](CompNode::Locator &loc) {
+      loc.type = CompNode::DeviceType::CPU;
     };
+  } else if (device == "multithread") {
+    load_config.comp_node_mapper = [thread_number](CompNode::Locator &loc) {
+      loc.type = CompNode::DeviceType::MULTITHREAD;
+      loc.device = 0;
+      loc.stream = thread_number;
+    };
+    std::cout << "use " << thread_number << " thread" << std::endl;
   } else {
-    std::cout << "device only support cuda or cpu" << std::endl;
+    std::cout << "device only support cuda or cpu or multithread" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -420,14 +416,7 @@ int main(int argc, char *argv[]) {
     }
 #endif
 #if defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
-    if (device == "cpu" && thread_number == 1) {
-      std::cout << "choose format for nchw88 for x86" << std::endl;
-      graph_opt.graph_opt.enable_nchw88();
-    }
-    if (device == "cpu" && run_with_fp16) {
-      std::cout << "fp16 no available for x86" << std::endl;
-      return EXIT_FAILURE;
-    }
+    // graph_opt.graph_opt.enable_nchw88();
 #endif
   }
 

@@ -5,16 +5,15 @@
 import sys
 import tempfile
 import time
+from collections import ChainMap
 from loguru import logger
 from tqdm import tqdm
 
 import numpy as np
 
-import megengine as mge
-import megengine.distributed as dist
-import megengine.functional as F
+import torch
 
-from yolox.utils import gather_pyobj, postprocess, time_synchronized
+from yolox.utils import gather, is_main_process, postprocess, synchronize, time_synchronized
 
 
 class VOCEvaluator:
@@ -22,9 +21,7 @@ class VOCEvaluator:
     VOC AP Evaluation class.
     """
 
-    def __init__(
-        self, dataloader, img_size, confthre, nmsthre, num_classes,
-    ):
+    def __init__(self, dataloader, img_size, confthre, nmsthre, num_classes):
         """
         Args:
             dataloader (Dataloader): evaluate dataloader.
@@ -40,10 +37,10 @@ class VOCEvaluator:
         self.nmsthre = nmsthre
         self.num_classes = num_classes
         self.num_images = len(dataloader.dataset)
-        self.is_main_process = dist.get_rank() == 0
 
     def evaluate(
-        self, model, distributed=False, decoder=None, test_size=None
+        self, model, distributed=False, half=False, trt_file=None,
+        decoder=None, test_size=None, return_outputs=False,
     ):
         """
         VOC average precision (AP) Evaluation. Iterate inference on the test dataset
@@ -60,53 +57,69 @@ class VOCEvaluator:
             summary (sr): summary info of evaluation.
         """
         # TODO half to amp_test
-        model.eval()
+        tensor_type = torch.cuda.HalfTensor if half else torch.cuda.FloatTensor
+        model = model.eval()
+        if half:
+            model = model.half()
         ids = []
         data_list = {}
-        progress_bar = tqdm if self.is_main_process else iter
+        progress_bar = tqdm if is_main_process() else iter
 
         inference_time = 0
         nms_time = 0
-        n_samples = len(self.dataloader) - 1
+        n_samples = max(len(self.dataloader) - 1, 1)
+
+        if trt_file is not None:
+            from torch2trt import TRTModule
+
+            model_trt = TRTModule()
+            model_trt.load_state_dict(torch.load(trt_file))
+
+            x = torch.ones(1, 3, test_size[0], test_size[1]).cuda()
+            model(x)
+            model = model_trt
 
         for cur_iter, (imgs, _, info_imgs, ids) in enumerate(progress_bar(self.dataloader)):
-            # skip the the last iters since batchsize might be not enough for batch inference
-            is_time_record = cur_iter < len(self.dataloader) - 1
-            if is_time_record:
-                start = time.time()
+            with torch.no_grad():
+                imgs = imgs.type(tensor_type)
 
-            outputs = model(imgs)
-            if decoder is not None:
-                outputs = decoder(outputs, dtype=outputs.type())
+                # skip the last iters since batchsize might be not enough for batch inference
+                is_time_record = cur_iter < len(self.dataloader) - 1
+                if is_time_record:
+                    start = time.time()
 
-            if is_time_record:
-                infer_end = time_synchronized()
-                inference_time += infer_end - start
+                outputs = model(imgs)
+                if decoder is not None:
+                    outputs = decoder(outputs, dtype=outputs.type())
 
-            outputs = postprocess(
-                outputs, self.num_classes, self.confthre, self.nmsthre
-            )
-            if is_time_record:
-                nms_end = time_synchronized()
-                nms_time += nms_end - infer_end
+                if is_time_record:
+                    infer_end = time_synchronized()
+                    inference_time += infer_end - start
+
+                outputs = postprocess(
+                    outputs, self.num_classes, self.confthre, self.nmsthre
+                )
+                if is_time_record:
+                    nms_end = time_synchronized()
+                    nms_time += nms_end - infer_end
 
             data_list.update(self.convert_to_voc_format(outputs, info_imgs, ids))
 
-        statistics = mge.tensor([inference_time, nms_time, n_samples]).astype("float32")
+        statistics = torch.cuda.FloatTensor([inference_time, nms_time, n_samples])
         if distributed:
-            statistics = F.distributed.all_reduce_sum(statistics)
-            statistics /= dist.get_world_size()
-            results = gather_pyobj(data_list, obj_name="data_list", target_rank_id=0)
-            for x in results[1:]:
-                data_list.extend(x)
+            data_list = gather(data_list, dst=0)
+            data_list = ChainMap(*data_list)
+            torch.distributed.reduce(statistics, dst=0)
 
         eval_results = self.evaluate_prediction(data_list, statistics)
-        dist.group_barrier()
+        synchronize()
+        if return_outputs:
+            return eval_results, data_list
         return eval_results
 
     def convert_to_voc_format(self, outputs, info_imgs, ids):
         predictions = {}
-        for (output, img_h, img_w, img_id) in zip(outputs, info_imgs[0], info_imgs[1], ids):
+        for output, img_h, img_w, img_id in zip(outputs, info_imgs[0], info_imgs[1], ids):
             if output is None:
                 predictions[int(img_id)] = (None, None, None)
                 continue
@@ -125,7 +138,7 @@ class VOCEvaluator:
         return predictions
 
     def evaluate_prediction(self, data_dict, statistics):
-        if not self.is_main_process:
+        if not is_main_process():
             return 0, 0, None
 
         logger.info("Evaluate in main process...")
@@ -138,15 +151,19 @@ class VOCEvaluator:
         a_nms_time = 1000 * nms_time / (n_samples * self.dataloader.batch_size)
 
         time_info = ", ".join(
-            ["Average {} time: {:.2f} ms".format(k, v) for k, v in zip(
-                ["forward", "NMS", "inference"],
-                [a_infer_time, a_nms_time, (a_infer_time + a_nms_time)]
-            )]
+            [
+                "Average {} time: {:.2f} ms".format(k, v)
+                for k, v in zip(
+                    ["forward", "NMS", "inference"],
+                    [a_infer_time, a_nms_time, (a_infer_time + a_nms_time)],
+                )
+            ]
         )
-
         info = time_info + "\n"
 
-        all_boxes = [[[] for _ in range(self.num_images)] for _ in range(self.num_classes)]
+        all_boxes = [
+            [[] for _ in range(self.num_images)] for _ in range(self.num_classes)
+        ]
         for img_num in range(self.num_images):
             bboxes, cls, scores = data_dict[img_num]
             if bboxes is None:
@@ -159,12 +176,10 @@ class VOCEvaluator:
                     all_boxes[j][img_num] = np.empty([0, 5], dtype=np.float32)
                     continue
 
-                c_dets = F.concat((bboxes, scores.unsqueeze(1)), axis=1)
+                c_dets = torch.cat((bboxes, scores.unsqueeze(1)), dim=1)
                 all_boxes[j][img_num] = c_dets[mask_c].numpy()
 
-            sys.stdout.write(
-                "im_eval: {:d}/{:d} \r".format(img_num + 1, self.num_images)
-            )
+            sys.stdout.write(f"im_eval: {img_num + 1}/{self.num_images} \r")
             sys.stdout.flush()
 
         with tempfile.TemporaryDirectory() as tempdir:
