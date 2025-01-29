@@ -6,3 +6,6 @@
 **/data/**
 
 Pytorch_Retinaface-master/weights/*
+
+YOLOX/datasets/VOCdevkit/VOC109/Annotations/*
+YOLOX/datasets/VOCdevkit/VOC109/JPEGImages/*
