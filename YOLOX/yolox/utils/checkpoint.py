@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-# Copyright (c) Megvii Inc. All rights reserved.
+# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
 import os
 import shutil
 from loguru import logger
 
-import torch
+import megengine as mge
 
 
 def load_ckpt(model, ckpt):
@@ -29,6 +29,8 @@ def load_ckpt(model, ckpt):
             continue
         load_dict[key_model] = v_ckpt
 
+    for i in range(3):
+        load_dict.pop("head.grids.{}".format(i))
     model.load_state_dict(load_dict, strict=False)
     return model
 
@@ -36,8 +38,8 @@ def load_ckpt(model, ckpt):
 def save_checkpoint(state, is_best, save_dir, model_name=""):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    filename = os.path.join(save_dir, model_name + "_ckpt.pth")
-    torch.save(state, filename)
+    filename = os.path.join(save_dir, model_name + "_ckpt.pkl")
+    mge.save(state, filename)
     if is_best:
-        best_filename = os.path.join(save_dir, "best_ckpt.pth")
+        best_filename = os.path.join(save_dir, "best_ckpt.pkl")
         shutil.copyfile(filename, best_filename)

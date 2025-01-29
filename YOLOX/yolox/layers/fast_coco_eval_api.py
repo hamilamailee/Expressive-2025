@@ -3,7 +3,7 @@
 # This file comes from
 # https://github.com/facebookresearch/detectron2/blob/master/detectron2/evaluation/fast_eval_api.py
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-# Copyright (c) Megvii Inc. All rights reserved.
+# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
 
 import copy
 import time
@@ -11,7 +11,9 @@ import time
 import numpy as np
 from pycocotools.cocoeval import COCOeval
 
-from .jit_ops import FastCOCOEvalOp
+# import torch first to make yolox._C work without ImportError of libc10.so
+# in YOLOX, env is already set in __init__.py.
+from yolox import _C
 
 
 class COCOeval_opt(COCOeval):
@@ -19,9 +21,6 @@ class COCOeval_opt(COCOeval):
     This is a slightly modified version of the original COCO API, where the functions evaluateImg()
     and accumulate() are implemented in C++ to speedup evaluation
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.module = FastCOCOEvalOp().load()
 
     def evaluate(self):
         """
@@ -39,9 +38,7 @@ class COCOeval_opt(COCOeval):
         if p.useSegm is not None:
             p.iouType = "segm" if p.useSegm == 1 else "bbox"
             print(
-                "useSegm (deprecated) is not None. Running {} evaluation".format(
-                    p.iouType
-                )
+                "useSegm (deprecated) is not None. Running {} evaluation".format(p.iouType)
             )
         print("Evaluate annotation type *{}*".format(p.iouType))
         p.imgIds = list(np.unique(p.imgIds))
@@ -73,7 +70,7 @@ class COCOeval_opt(COCOeval):
             # to access in C++
             instances_cpp = []
             for instance in instances:
-                instance_cpp = self.module.InstanceAnnotation(
+                instance_cpp = _C.InstanceAnnotation(
                     int(instance["id"]),
                     instance["score"] if is_det else instance.get("score", 0.0),
                     instance["area"],
@@ -107,7 +104,7 @@ class COCOeval_opt(COCOeval):
             ]
 
         # Call C++ implementation of self.evaluateImgs()
-        self._evalImgs_cpp = self.module.COCOevalEvaluateImages(
+        self._evalImgs_cpp = _C.COCOevalEvaluateImages(
             p.areaRng,
             maxDet,
             p.iouThrs,
@@ -132,7 +129,7 @@ class COCOeval_opt(COCOeval):
         if not hasattr(self, "_evalImgs_cpp"):
             print("Please run evaluate() first")
 
-        self.eval = self.module.COCOevalAccumulate(self._paramsEval, self._evalImgs_cpp)
+        self.eval = _C.COCOevalAccumulate(self._paramsEval, self._evalImgs_cpp)
 
         # recall is num_iou_thresholds X num_categories X num_area_ranges X num_max_detections
         self.eval["recall"] = np.array(self.eval["recall"]).reshape(

@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright (c) Megvii Inc. All rights reserved.
+# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
 import functools
 import os
 import time
 from collections import defaultdict, deque
-import psutil
 
 import numpy as np
 
-import torch
+import megengine as mge
 
 __all__ = [
     "AverageMeter",
     "MeterBuffer",
     "get_total_and_free_memory_in_Mb",
-    "occupy_mem",
-    "gpu_mem_usage",
-    "mem_usage"
+    "time_synchronized",
 ]
 
 
@@ -26,40 +23,13 @@ def get_total_and_free_memory_in_Mb(cuda_device):
         "nvidia-smi --query-gpu=memory.total,memory.used --format=csv,nounits,noheader"
     )
     devices_info = devices_info_str.read().strip().split("\n")
-    if "CUDA_VISIBLE_DEVICES" in os.environ:
-        visible_devices = os.environ["CUDA_VISIBLE_DEVICES"].split(',')
-        cuda_device = int(visible_devices[cuda_device])
     total, used = devices_info[int(cuda_device)].split(",")
     return int(total), int(used)
 
 
-def occupy_mem(cuda_device, mem_ratio=0.9):
-    """
-    pre-allocate gpu memory for training to avoid memory Fragmentation.
-    """
-    total, used = get_total_and_free_memory_in_Mb(cuda_device)
-    max_mem = int(total * mem_ratio)
-    block_mem = max_mem - used
-    x = torch.cuda.FloatTensor(256, 1024, block_mem)
-    del x
-    time.sleep(5)
-
-
-def gpu_mem_usage():
-    """
-    Compute the GPU memory usage for the current device (MB).
-    """
-    mem_usage_bytes = torch.cuda.max_memory_allocated()
-    return mem_usage_bytes / (1024 * 1024)
-
-
-def mem_usage():
-    """
-    Compute the memory usage for the current machine (GB).
-    """
-    gb = 1 << 30
-    mem = psutil.virtual_memory()
-    return mem.used / gb
+def time_synchronized():
+    mge._full_sync()
+    return time.time()
 
 
 class AverageMeter:
@@ -128,8 +98,6 @@ class MeterBuffer(defaultdict):
             values = {}
         values.update(kwargs)
         for k, v in values.items():
-            if isinstance(v, torch.Tensor):
-                v = v.detach()
             self[k].update(v)
 
     def clear_meters(self):
