@@ -15,8 +15,8 @@ class Exp(MyExp):
         self.depth = 1.0
         self.width = 1.0
         self.warmup_epochs = 1
-        # self.max_epoch = 300
-        self.max_epoch = 25
+        self.max_epoch = 300
+        # self.max_epoch = 10
 
         # ---------- transform config ------------ #
         self.mosaic_prob = 1.0
@@ -45,7 +45,7 @@ class Exp(MyExp):
         with wait_for_the_master(local_rank):
             dataset = VOCDetection(
                 data_dir=os.path.join(get_yolox_datadir(), "VOCdevkit"),
-                image_sets=[('109', 'train'), ('109', 'test'), ('109', 'val')],
+                image_sets=[('109', 'train')],
                 img_size=self.input_size,
                 preproc=TrainTransform(
                     max_labels=50,
@@ -103,7 +103,7 @@ class Exp(MyExp):
 
         valdataset = VOCDetection(
             data_dir=os.path.join(get_yolox_datadir(), "VOCdevkit"),
-            image_sets=[('2012', 'valid')],
+            image_sets=[('109', 'test')],
             img_size=self.test_size,
             preproc=ValTransform(legacy=legacy),
         )

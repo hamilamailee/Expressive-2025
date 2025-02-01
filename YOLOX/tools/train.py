@@ -131,8 +131,8 @@ if __name__ == "__main__":
     num_gpu = get_num_devices() if args.devices is None else args.devices
     assert num_gpu <= get_num_devices()
 
-    if args.cache is not None:
-        exp.dataset = exp.get_dataset(cache=True, cache_type=args.cache)
+    # if args.cache is not None:
+    #     exp.dataset = exp.get_dataset(cache=True, cache_type=args.cache)
 
     dist_url = "auto" if args.dist_url is None else args.dist_url
     launch(

@@ -76,7 +76,8 @@ if __name__ == '__main__':
     boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3]/2.
     boxes_xyxy /= ratio
     dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1)
-    if dets is not None:
+    # if dets is not None:
+    if len(dets) != 0:
         final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
         origin_img = vis(origin_img, final_boxes, final_scores, final_cls_inds,
                          conf=args.score_thr, class_names=COCO_CLASSES)

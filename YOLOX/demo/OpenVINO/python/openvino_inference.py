@@ -141,7 +141,8 @@ def main():
     boxes_xyxy /= ratio
     dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1)
 
-    if dets is not None:
+    # if dets is not None:
+    if len(dets) != 0:
         final_boxes = dets[:, :4]
         final_scores, final_cls_inds = dets[:, 4], dets[:, 5]
         origin_img = vis(origin_img, final_boxes, final_scores, final_cls_inds,

@@ -11,7 +11,7 @@ from yolox.exp import Exp as MyExp
 class Exp(MyExp):
     def __init__(self):
         super(Exp, self).__init__()
-        self.num_classes = 1
+        self.num_classes = 2
         self.depth = 0.33
         self.width = 0.375
         self.input_size = (416, 416)
@@ -21,6 +21,7 @@ class Exp(MyExp):
         self.enable_mixup = False
         self.warmup_epochs = 1
         self.max_epoch = 300
+        # self.max_epoch = 10
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
     def get_data_loader(self, batch_size, is_distributed, no_aug=False, cache_img=False):
@@ -42,11 +43,11 @@ class Exp(MyExp):
         with wait_for_the_master(local_rank):
             dataset = VOCDetection(
                 data_dir=os.path.join(get_yolox_datadir(), "VOCdevkit"),
-                image_sets=[('2012', 'train')],
+                image_sets=[('109', 'train')],
                 img_size=self.input_size,
                 preproc=TrainTransform(
                     max_labels=50,
-                    flip_prob=self.flip_prob,
+                    flip_prob=self.flip_prob, 
                     hsv_prob=self.hsv_prob),
                 cache=cache_img,
             )
@@ -100,7 +101,7 @@ class Exp(MyExp):
 
         valdataset = VOCDetection(
             data_dir=os.path.join(get_yolox_datadir(), "VOCdevkit"),
-            image_sets=[('2012', 'test')],
+            image_sets=[('109', 'test')],
             img_size=self.test_size,
             preproc=ValTransform(legacy=legacy),
         )
