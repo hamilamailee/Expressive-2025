@@ -5,6 +5,8 @@
 **/jnotebook*
 **/data/**
 
+apex/*
+
 Pytorch_Retinaface-master/weights/*
 
 YOLOX/datasets/VOCdevkit/VOC109/Annotations/*
