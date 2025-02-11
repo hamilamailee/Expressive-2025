@@ -1,4 +1,3 @@
-import json
 import copy
 import io
 from contextlib import redirect_stdout
@@ -6,8 +5,7 @@ from contextlib import redirect_stdout
 import numpy as np
 import pycocotools.mask as mask_util
 import torch
-
-from . import utils
+import utils
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
@@ -30,23 +28,11 @@ class CocoEvaluator:
     def update(self, predictions):
         img_ids = list(np.unique(list(predictions.keys())))
         self.img_ids.extend(img_ids)
+
         for iou_type in self.iou_types:
             results = self.prepare(predictions, iou_type)
-            resFile = results
-            if type(resFile) == str or (type(resFile) == bytes):
-                with open(resFile) as f:
-                    anns = json.load(f)
-            elif type(resFile) == np.ndarray:
-                anns = COCO.loadNumpyAnnotations(resFile)
-            else:
-                anns = resFile
-            annsImgIds = [ann['image_id'] for ann in anns]
-            print("start")
-            print(annsImgIds)
-            print("*****************")
-            print(self.coco_gt.getImgIds())
-            # with redirect_stdout(io.StringIO()):
-            coco_dt = COCO.loadRes(self.coco_gt, results) if results else COCO()
+            with redirect_stdout(io.StringIO()):
+                coco_dt = COCO.loadRes(self.coco_gt, results) if results else COCO()
             coco_eval = self.coco_eval[iou_type]
 
             coco_eval.cocoDt = coco_dt
