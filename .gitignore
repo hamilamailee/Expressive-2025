@@ -14,3 +14,6 @@ Pytorch_Retinaface-master/weights/*
 
 YOLOX/datasets/VOCdevkit/VOC109/Annotations/*
 YOLOX/datasets/VOCdevkit/VOC109/JPEGImages/*
+
+Faster R-CNN/**/*.pth
+Faster R-CNN/manga109_COCO/**/*.jpg
