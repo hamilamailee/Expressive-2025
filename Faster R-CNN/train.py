@@ -41,7 +41,7 @@ def copypaste_collate_fn(batch):
 
 
 def get_dataset(is_train, args):
-    image_set = "train" if is_train else "val"
+    image_set = "train" if is_train else "test"
     num_classes, mode = {"coco": (3, "instances"), "coco_kp": (2, "person_keypoints")}[args.dataset]
     with_masks = "mask" in args.model
     ds = get_coco(
@@ -288,7 +288,7 @@ def main(args):
         )
 
     if args.resume:
-        checkpoint = torch.load(args.resume, map_location="cpu", weights_only=True)
+        checkpoint = torch.load(args.resume, map_location="cpu", weights_only=False)
         model_without_ddp.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
