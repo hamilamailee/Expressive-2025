@@ -22,6 +22,7 @@ from yolox.utils import (
     get_model_info,
     setup_logger
 )
+from export_coco_annotation import export_annotation
 
 
 def make_parser():
@@ -195,6 +196,18 @@ def main(exp, args, num_gpu):
     )
     logger.info("\n" + summary)
 
+    voc_detection = evaluator.dataloader.dataset
+    results_dir = os.path.join(
+        voc_detection.root, 
+        "results", 
+        "VOC" + voc_detection._year, 
+        "Main")
+    images_dir = os.path.join(
+        voc_detection.root,
+        "VOC" + voc_detection._year,
+        "JPEGImages"
+    )
+    export_annotation(results_dir, images_dir, exp.exp_name)
 
 if __name__ == "__main__":
     configure_module()
