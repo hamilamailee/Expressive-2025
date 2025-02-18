@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 # Copyright (c) Megvii, Inc. and its affiliates.
-
+import json
 import argparse
 import os
 import time
@@ -190,21 +190,74 @@ def image_demo(predictor, vis_folder, path, current_time, save_result):
     else:
         files = [path]
     files.sort()
-    for image_name in files:
+
+    # COCO annotation structure
+    coco_annotations = {
+        "images": [],
+        "annotations": [],
+        "categories": []
+    }
+
+    category_set = set()
+    annotation_id = 1
+    
+    save_folder = os.path.join(
+        vis_folder, time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
+    )
+    os.makedirs(save_folder, exist_ok=True)
+    
+    for image_id, image_name in enumerate(files):
         print(image_name)
         outputs, img_info = predictor.inference(image_name)
         result_image = predictor.visual(outputs[0], img_info, predictor.confthre)
+        
+        height, width = img_info["raw_img"].shape[:2]
+        coco_annotations["images"].append({
+            "id": image_id,
+            "file_name": os.path.basename(image_name),
+            "width": width,
+            "height": height
+        })
+        
+        if outputs[0] is not None:
+            output = outputs[0].cpu().numpy()
+            bboxes = output[:, 0:4] / img_info["ratio"]  # Resize back to original size
+            scores = output[:, 4] * output[:, 5]
+            classes = output[:, 6].astype(int)
+            
+            for i in range(len(bboxes)):
+                x_min, y_min, x_max, y_max = bboxes[i]
+                width = x_max - x_min
+                height = y_max - y_min
+                category_id = int(classes[i])
+                score = float(scores[i])
+                
+                coco_annotations["annotations"].append({
+                    "id": annotation_id,
+                    "image_id": image_id,
+                    "category_id": category_id,
+                    "bbox": [float(x_min), float(y_min), float(width), float(height)],
+                    "area": float(width * height),
+                    "iscrowd": 0,
+                    "score": score
+                })
+                annotation_id += 1
+                category_set.add(category_id)
+        
         if save_result:
-            save_folder = os.path.join(
-                vis_folder, time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
-            )
-            os.makedirs(save_folder, exist_ok=True)
             save_file_name = os.path.join(save_folder, os.path.basename(image_name))
             logger.info("Saving detection result in {}".format(save_file_name))
             cv2.imwrite(save_file_name, result_image)
+        
         ch = cv2.waitKey(0)
         if ch == 27 or ch == ord("q") or ch == ord("Q"):
             break
+    
+    # Save COCO annotations
+    annotation_file = os.path.join(save_folder, "annotations.json")
+    with open(annotation_file, "w") as f:
+        json.dump(coco_annotations, f, indent=4)
+    logger.info("Saved COCO annotations at {}".format(annotation_file))
 
 
 def imageflow_demo(predictor, vis_folder, current_time, args):
