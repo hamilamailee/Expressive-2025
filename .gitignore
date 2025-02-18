@@ -1,13 +1,31 @@
-.vscode/*
-
-**/__pycache__/**
-**/jobscript
-**/jnotebook*
 **/.DS_Store
 **/.vscode
 **/.ipynb_checkpoints
 
+**/__pycache__/**
+**/jobscript
+**/jnotebook*
+
 data/*
+
+##### ----------------------------YOLOX---------------------------- #####
+
+**/build/**
+**/*cache*/**
+**/tensorboard/**
+**/vis_res/**
+**/*.pth
+**/*log.txt
+**/*egg-info/*
+
+YOLOX/datasets/VOCdevkit/VOC109/Annotations/*.xml
+YOLOX/datasets/VOCdevkit/VOC109/data/*.jpg
+YOLOX/datasets/VOCdevkit/results/VOC109/Main/*.txt
+YOLOX/datasets/VOCdevkit/results/VOC109/Main/labels/*.txt
+YOLOX/datasets/VOCdevkit/VOC109/JPEGImages/*.jpg
+YOLOX/yolox/layers/*
+
+##### -------------------------------------------------------- #####
 
 Faster R-CNN/**/*.pth
 Faster R-CNN/manga109_COCO/**/*.jpg
