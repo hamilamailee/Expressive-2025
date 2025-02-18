@@ -31,10 +31,21 @@ To use YOLOX on our dataset, we have selected two versions: YOLOX-Tiny and YOLOX
 ```bash
   # YOLOX-l Training
   python tools/train.py -f exps/ExpConfigs/yolox_voc_l.py -d 1 -b 8 --fp16 -o -c yolox_l.pth
-
+```
+```bash
   # YOLOX-Tiny Training
   python tools/train.py -f exps/ExpConfigs/yolox_voc_t.py -d 1 -b 8 --fp16 -o -c yolox_tiny.pth
 ```
 After training, the best checkpoints will be saved in the `YOLOX_outputs/yolox_voc_l` and `YOLOX_outputs/yolox_voc_t` directories, under the name `best_ckpt.pth`. 
 
 > If you want to use the pretrained weights, you can download them from this [link](https://drive.google.com/drive/folders/1wdWdzIgH2G84_RILtLOEddCRh8MBC-dB?usp=drive_link), which follows the same structure as `YOLOX_outputs`.
+
+## Evaluating
+```bash
+  # YOLOX-l Evaluating
+  python tools/eval.py -n yolox-l -f exps/ExpConfigs/yolox_voc_l.py -d 1 -b 8 --fp16 -c ./YOLOX_outputs/yolox_voc_l/best_ckpt.pth --conf 0.001
+```
+```bash
+  # YOLOX-Tiny Evaluating
+  python tools/eval.py -n yolox-t -f exps/ExpConfigs/yolox_voc_t.py -d 1 -b 8 --fp16-c ./YOLOX_outputs/yolox_voc_t/best_ckpt.pth --conf 0.001
+```
