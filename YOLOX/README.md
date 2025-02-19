@@ -42,7 +42,7 @@ After training, the best checkpoints will be saved in the `YOLOX_outputs/yolox_v
 
 ## Evaluating
 
-Since YOLOX and Faster R-CNN use different methods to calculate Average Precision and IoU metrics, the best approach is to export COCO annotations during evaluation and compare all results against ground-truth bounding boxes. To achieve this, the code has been modified to export COCO annotations of predicted boxes to the `dataset` directory by default. Instructions on the contents and arrangement of the `dataset` folder are available [here](##Dataset).
+Since YOLOX and Faster R-CNN use different methods to calculate Average Precision and IoU metrics, the best approach is to export COCO annotations during evaluation and compare all results against ground-truth bounding boxes. To achieve this, the code has been modified to export COCO annotations of predicted boxes to the `dataset` directory by default. Instructions on the contents and arrangement of the `dataset` folder are available [here](#Dataset).
 
 ```bash
   # YOLOX-l Evaluating
