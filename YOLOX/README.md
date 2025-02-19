@@ -1,4 +1,3 @@
-
 # YOLOX
 
 YOLOX is an object detection model derived from the repository: [Megvii-BaseDetection](https://github.com/Megvii-BaseDetection/YOLOX)
@@ -41,6 +40,9 @@ After training, the best checkpoints will be saved in the `YOLOX_outputs/yolox_v
 > If you want to use the pretrained weights, you can download them from this [link](https://drive.google.com/drive/folders/1wdWdzIgH2G84_RILtLOEddCRh8MBC-dB?usp=drive_link), which follows the same structure as `YOLOX_outputs`.
 
 ## Evaluating
+
+Since YOLOX and Faster R-CNN use different methods to calculate Average Precision and IoU metrics, the best approach is to export COCO annotations during evaluation and compare all results against ground-truth bounding boxes. To achieve this, the code has been modified to export COCO annotations of predicted boxes to the `dataset` directory by default. Instructions on the contents and arrangement of the `dataset` folder are available [here](##Dataset).
+
 ```bash
   # YOLOX-l Evaluating
   python tools/eval.py -n yolox-l -f exps/ExpConfigs/yolox_voc_l.py -d 1 -b 8 --fp16 -c ./YOLOX_outputs/yolox_voc_l/best_ckpt.pth --conf 0.001
@@ -49,3 +51,5 @@ After training, the best checkpoints will be saved in the `YOLOX_outputs/yolox_v
   # YOLOX-Tiny Evaluating
   python tools/eval.py -n yolox-t -f exps/ExpConfigs/yolox_voc_t.py -d 1 -b 8 --fp16-c ./YOLOX_outputs/yolox_voc_t/best_ckpt.pth --conf 0.001
 ```
+
+## Dataset
