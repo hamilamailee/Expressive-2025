@@ -22,6 +22,7 @@ Create a conda environment from the `yolo.yml` file and activate it:
   conda env create -f yolo.yml
   source activate yolo # or conda activate yolo
 ```
+## Dataset
 
 ## Training
 
@@ -51,5 +52,3 @@ Since YOLOX and Faster R-CNN use different methods to calculate Average Precisio
   # YOLOX-Tiny Evaluating
   python tools/eval.py -n yolox-t -f exps/ExpConfigs/yolox_voc_t.py -d 1 -b 8 --fp16-c ./YOLOX_outputs/yolox_voc_t/best_ckpt.pth --conf 0.001
 ```
-
-## Dataset
