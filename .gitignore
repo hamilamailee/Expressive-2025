@@ -18,7 +18,6 @@ data/*
 **/*log.txt
 **/*egg-info/*
 
-YOLOX/datasets/VOCdevkit/VOC109/Annotations/*.xml
 YOLOX/datasets/VOCdevkit/VOC109/data/*.jpg
 YOLOX/datasets/VOCdevkit/results/VOC109/Main/*.txt
 YOLOX/datasets/VOCdevkit/results/VOC109/Main/labels/*.txt
