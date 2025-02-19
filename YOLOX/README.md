@@ -22,8 +22,61 @@ Create a conda environment from the `yolo.yml` file and activate it:
   conda env create -f yolo.yml
   source activate yolo # or conda activate yolo
 ```
-## Dataset
 
+
+## Datasets
+
+To start with the training and evaluation of our dataset, we first need to match our dataset format with the accepted input format of YOLOX. After acquiring access to the [Manga109 Dataset](http://www.manga109.org/en/), the landmarks were retrieved from [here](https://github.com/oaugereau/FacialLandmarkManga). Since our work focuses on eye and mouth detection, the bounding boxes were extracted from the facial landmarks, and the edges were extended by 15% to increase coverage.
+
+The current files in the `datasets/VOCdevkit/VOC109/ImageSets` directory separate the file names based on the `train`, `test` and `val` splits. All the images corresponding to the given names should be placed under `datasets/VOCdevkit/VOC109/JPEGImages`, so the `datasets/VOCdevkit/VOC109/Annotations` folder can contain the corresponding annotations. The modified bounding box annotations are available in this repository for convenience.
+
+To visualize the images and the annotations, the script below can be run from the `YOLOX` directory.
+
+> The images in the `datasets/VOCdevkit/VOC109/ImageSets` directory should be cropped faces from the original Manga109 dataset, not full images.
+
+```python
+import fiftyone as fo
+
+name = "VOC109_dataset"
+data_path = "./datasets/VOCdevkit/VOC109/JPEGImages"
+labels_path = "./datasets/VOCdevkit/VOC109/Annotations"
+
+# Import dataset by explicitly providing paths to the source media and labels
+dataset = fo.Dataset.from_dir(
+    dataset_type=fo.types.VOCDetectionDataset,
+    data_path=data_path,
+    labels_path=labels_path,
+    name=name,
+)
+
+fo.launch_app(dataset)
+```
+
+The final structure of the `dataset` folder is like below:
+
+```
+datasets
+└── VOCdevkit
+    └── VOC109
+        ├── Annotations
+        │   ├── <file1>.xml
+        │   ├── <file2>.xml
+        │   ├── <file3>.xml
+        │   └── ...
+        ├── ImageSets
+        │   └── Main
+        │       ├── test.txt
+        │       ├── train.txt
+        │       └── val.txt
+        └── JPEGImages
+            ├── <file1>.jpg
+            ├── <file2>.jpg
+            ├── <file3>.jpg
+            └── ...
+```
+
+### TODO
+- [ ] Share the script for retrieving cropped images based on annotations from the original Manga109 dataset.
 ## Training
 
 To use YOLOX on our dataset, we have selected two versions: YOLOX-Tiny and YOLOX-l. The training of both models follows the default settings provided by the authors in the original repository, and the files for downloading the initial pretrained weights can be found at the [YOLOX-l](https://drive.google.com/file/d/13ZChAp4VTmE5L-0NLEaibag98gurBR0s/view?usp=sharing) and [YOLOX-Tiny](https://drive.google.com/file/d/1kSIWV-CEEMtdHgs0grh_qw7m0eziqlVi/view?usp=drive_link) links, respectivley. After downloading the `.pth` files from the provided links, place them in the `Expressive/YOLOX/` directory. 
