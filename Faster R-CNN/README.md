@@ -13,7 +13,7 @@ Clone the project:
 Navigate to the project directory:
 
 ```bash
-  cd "Faster R-CNN"
+  cd "Expressive/Faster R-CNN"
 ```
 
 Create a conda environment from the `fasterrcnn.yml` file and activate it:
