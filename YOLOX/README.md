@@ -13,7 +13,7 @@ Clone the project:
 Navigate to the project directory:
 
 ```bash
-  cd Expressive/YOLOX
+  cd "Expressive/YOLOX"
 ```
 
 Create a conda environment from the `yolo.yml` file and activate it:
