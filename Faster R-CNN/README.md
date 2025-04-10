@@ -25,6 +25,9 @@ Create a conda environment from the `fasterrcnn.yml` file and activate it:
 
 ## Datasets
 
+
+## Training
+
 To match the training script (`train.py`) with our dataset, the following adjustments have to be made:
 
 ### `coco_eval.py`
@@ -34,16 +37,24 @@ class CocoEvaluator:
   ...
   def update(self, predictions):
     ...
-    with redirect_stdout(io.StringIO()):
-      coco_dt = COCO.loadRes(self.coco_gt, results) if results else COCO()
-+   try:
-+     with open('export_my_test.json', 'a') as f:
-+       for ann in coco_dt.dataset["annotations"]:
-+         json.dump(ann, f)
-+         json.dump(",", f)
-+         f.close()
-+   except:
-+     print("Error with img {}".format(img_ids))
+    for iou_type in self.iou_types:
+      ...
++     try:
++       with open(f'export_ann_results.json', 'a') as f:
++         for ann in coco_dt.dataset["annotations"]:
++           json.dump(ann, f)
++           json.dump(",", f)
++           f.close()
++     except:
++       print("Error with img {} in annotation".format(img_ids))
++     try:
++       with open(f'export_img_results.json', 'a') as f:
++         for img in coco_dt.dataset["images"]:
++           json.dump(img, f)
++           json.dump(",", f)
++           f.close()
++     except:
++       print("Error with img {} in image".format(img_ids))
 ```
 This piece of code saves the evaluation results in COCO format to a JSON file for better comparison and visualization in the next steps.
 
@@ -83,7 +94,7 @@ To include our train, validation, and test datasets, along with our out-of-domai
 ```python
 ...
 def get_dataset(is_train, args):
-+   image_set = "train" if is_train else "my_test"
++   image_set = "train" if is_train else "test"
 +   num_classes, mode = {"coco": (3, "instances"), "coco_kp": (2, "person_keypoints")}[args.dataset]
     ...
 ```
