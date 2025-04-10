@@ -41,7 +41,7 @@ def copypaste_collate_fn(batch):
 
 
 def get_dataset(is_train, args):
-    image_set = "train" if is_train else "test"
+    image_set = "train" if is_train else "my_test"
     num_classes, mode = {"coco": (3, "instances"), "coco_kp": (2, "person_keypoints")}[args.dataset]
     with_masks = "mask" in args.model
     ds = get_coco(
