@@ -78,3 +78,24 @@ def get_coco(root, image_set, transforms, mode="instances", use_v2=False, with_m
     ...
 ```
 To include our train, validation, and test datasets, along with our out-of-domain test cases, we add the lines above to the code to define the paths to our folders. The `test` folder contains the test set used during training, while the `my_test` folder contains out-of-domain instances—specifically, some photos from the `iCartoonFace` dataset and images from _Monsters, Inc._.
+
+### `train.py`
+```python
+...
+def get_dataset(is_train, args):
++   image_set = "train" if is_train else "my_test"
++   num_classes, mode = {"coco": (3, "instances"), "coco_kp": (2, "person_keypoints")}[args.dataset]
+    ...
+```
+The change in `image_set` is important for the different stages of training, validation, and testing. For the testing stage, the value is set to `test`, while `my_test` is used for the out-of-domain instances.
+
+```python
+...
+def main(args):
+    ...
+    if args.resume:
++       checkpoint = torch.load(args.resume, map_location="cpu", weights_only=False)
+        ...
+```
+As mentiond in PyTorch documention outlined [here](), we have:
+> If loading an old checkpoint that contains an `nn.Module`, we recommend `weights_only=False`. 
