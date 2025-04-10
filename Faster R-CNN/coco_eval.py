@@ -34,14 +34,23 @@ class CocoEvaluator:
             results = self.prepare(predictions, iou_type)
             with redirect_stdout(io.StringIO()):
                 coco_dt = COCO.loadRes(self.coco_gt, results) if results else COCO()
-            with open('export.json', 'a') as f:
-                for ann in coco_dt.dataset["annotations"]:
-                    json.dump(ann, f)
-                f.close()
-            with open('export_img.json', 'a') as f:
-                for img in coco_dt.dataset["images"]:
-                    json.dump(img, f)
-                f.close()
+            try:
+                with open(f'export_ann_results.json', 'a') as f:
+                    for ann in coco_dt.dataset["annotations"]:
+                        json.dump(ann, f)
+                        json.dump(",", f)
+                    f.close()
+            except:
+                print("Error with img {} in annotation".format(img_ids))
+            try:
+                with open(f'export_img_results.json', 'a') as f:
+                    for img in coco_dt.dataset["images"]:
+                        json.dump(img, f)
+                        json.dump(",", f)
+                    f.close()
+            except:
+                print("Error with img {} in image".format(img_ids))
+                
             coco_eval = self.coco_eval[iou_type]
 
             coco_eval.cocoDt = coco_dt
