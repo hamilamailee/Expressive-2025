@@ -64,3 +64,17 @@ class ConvertCocoPolysToMask:
     ...
 ```
 Since the annotated data does not contain any `segmentations` or `masks`, those parts have been commented out.
+```python
+...
+def get_coco(root, image_set, transforms, mode="instances", use_v2=False, with_masks=False):
+    anno_file_template = "{}_{}2017.json"
+    PATHS = {
+        "train": ("train2017", os.path.join("annotations", anno_file_template.format(mode, "train"))),
+        "val": ("val2017", os.path.join("annotations", anno_file_template.format(mode, "val"))),
++       "test": ("test2017", os.path.join("annotations", anno_file_template.format(mode, "test"))),
++       "my_test": ("my_test", os.path.join("annotations", anno_file_template.format(mode, "my_test"))),
+        # "train": ("val2017", os.path.join("annotations", anno_file_template.format(mode, "val")))
+    }
+    ...
+```
+To include our train, validation, and test datasets, along with our out-of-domain test cases, we add the lines above to the code to define the paths to our folders. The `test` folder contains the test set used during training, while the `my_test` folder contains out-of-domain instances—specifically, some photos from the `iCartoonFace` dataset and images from _Monsters, Inc._.
